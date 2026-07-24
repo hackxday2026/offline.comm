@@ -1,0 +1,19 @@
+{
+  "name": "esp32-mesh-chat-backend",
+  "version": "1.0.0",
+  "description": "Offline serial <-> WebSocket bridge for ESP32 + NRF24L01 mesh chat prototype",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "lowdb": "^7.0.1",
+    "serialport": "^12.0.0",
+    "ws": "^8.18.0"
+  }
+}
