@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ESP32 NRF24 Chat</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090b14;
+        --panel: rgba(14, 20, 40, 0.95);
+        --panel-2: rgba(30, 44, 76, 0.92);
+        --text: #f3f5ff;
+        --muted: #9ca4c4;
+        --accent: #4f8cff;
+        --accent-soft: rgba(79, 140, 255, 0.16);
+        --peer: #1f2937;
+        --peer-text: #eef2ff;
+        --success: #22c55e;
+        --warn: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(79, 140, 255, 0.18),
+            transparent 25%
+          ),
+          radial-gradient(
+            circle at bottom right,
+            rgba(34, 197, 94, 0.16),
+            transparent 20%
+          ),
+          linear-gradient(180deg, #0b1124 0%, #111827 48%, #151b2f 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"%3E%3Cg fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"%3E%3Cpath d="M0 60h120"/%3E%3Cpath d="M60 0v120"/%3E%3C/g%3E%3C/svg%3E')
+          center/180px repeat;
+        pointer-events: none;
+      }
+
+      .page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 18px 32px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+        letter-spacing: -0.04em;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 640px;
+        line-height: 1.75;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 28px;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.18);
+        overflow: hidden;
+        backdrop-filter: blur(16px);
+      }
+
+      .card-header {
+        padding: 22px 24px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .title-block {
+        min-width: 0;
+      }
+
+      .title-block span {
+        display: block;
+        color: var(--accent);
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .title-block h2 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(76, 121, 255, 0.12);
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--warn);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+      }
+
+      .status-indicator.connected {
+        background: var(--success);
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+      }
+
+      .log-box {
+        min-height: 420px;
+        max-height: 62vh;
+        overflow-y: auto;
+        padding: 20px 18px;
+        display: grid;
+        gap: 10px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          rgba(255, 255, 255, 0.04)
+        );
+      }
+
+      .message {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        animation: fadeIn 250ms ease;
+      }
+
+      .message.me {
+        align-items: flex-end;
+      }
+
+      .message.peer {
+        align-items: flex-start;
+      }
+
+      .message.system {
+        align-items: center;
+      }
+
+      .bubble {
+        position: relative;
+        max-width: min(82%, 520px);
+        padding: 14px 18px;
+        border-radius: 22px;
+        line-height: 1.6;
+        word-break: break-word;
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08);
+      }
+
+      .me .bubble {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: #fff;
+      }
+
+      .peer .bubble {
+        background: var(--peer);
+        color: var(--peer-text);
+      }
+
+      .system .bubble {
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.95rem;
+        box-shadow: none;
+      }
+
+      .meta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .actions {
+        display: grid;
+        gap: 12px;
+        padding: 18px 22px 22px;
+      }
+
+      .input-row {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr auto;
+      }
+
+      .input-row input {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 14px 16px;
+        font-size: 1rem;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        outline: none;
+        transition:
+          border-color 150ms ease,
+          box-shadow 150ms ease;
+      }
+
+      .input-row input:focus {
+        border-color: rgba(79, 140, 255, 0.56);
+        box-shadow: 0 0 0 4px rgba(79, 140, 255, 0.12);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .input-row button,
+      .chips button {
+        border: none;
+        border-radius: 18px;
+        padding: 14px 18px;
+        color: #fff;
+        background: linear-gradient(135deg, #4f8cff, #3b82f6);
+        cursor: pointer;
+        font-size: 0.98rem;
+        transition:
+          transform 120ms ease,
+          box-shadow 120ms ease,
+          opacity 120ms ease;
+      }
+
+      .input-row button:hover,
+      .chips button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 24px rgba(59, 130, 246, 0.25);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chips button {
+        background: rgba(79, 140, 255, 0.14);
+        color: var(--text);
+      }
+
+      .chips button.active {
+        background: rgba(79, 140, 255, 0.24);
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          padding: 20px 14px 24px;
+        }
+
+        .card-header,
+        .actions {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="title-block">
+          <span>ESP32 NRF24 Chat</span>
+          <h1>Interactive serial chat with style</h1>
+        </div>
+        <p>
+          Send and receive messages over the ESP32 serial bridge with a polished
+          chat UI, animated message bubbles, quick replies, and real-time
+          connection status.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <span>Live bridge</span>
+            <h2>Device chat panel</h2>
+          </div>
+          <div class="status-pill" id="status-pill">
+            <span class="status-indicator" id="status-dot"></span>
+            <span id="status">connecting...</span>
+          </div>
+        </div>
+
+        <div class="log-box" id="log"></div>
+
+        <div class="actions">
+          <div class="input-row">
+            <input
+              id="msg"
+              type="text"
+              placeholder="Type a message..."
+              autocomplete="off"
+            />
+            <button id="sendButton" onclick="sendMsg()">Send</button>
+          </div>
+          <div class="chips" id="quickReplies">
+            <button onclick="sendQuick('Hello from browser')">Hello</button>
+            <button onclick="sendQuick('Status?')">Status</button>
+            <button onclick="sendQuick('Ping')">Ping</button>
+          </div>
+          <div class="hint">
+            Press Enter to send, or use a quick reply. Connected ESP32 messages
+            appear instantly.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const log = document.getElementById("log");
+      const input = document.getElementById("msg");
+      const statusEl = document.getElementById("status");
+      const statusDot = document.getElementById("status-dot");
+      const sendButton = document.getElementById("sendButton");
+      let ws;
+      let unread = 0;
+      let windowFocused = true;
+
+      function setStatus(text, connected = false) {
+        statusEl.textContent = text;
+        statusDot.classList.toggle("connected", connected);
+      }
+
+      function connect() {
+        ws = new WebSocket("ws://" + location.host);
+
+        ws.onopen = () => {
+          setStatus("connected", true);
+          appendSystem("Connected to the device. Ready to chat.");
+        };
+
+        ws.onclose = () => {
+          setStatus("disconnected - retrying...", false);
+          appendSystem("Connection lost. Reconnecting...");
+          setTimeout(connect, 1500);
+        };
+
+        ws.onerror = () => {
+          if (ws.readyState !== WebSocket.OPEN) {
+            ws.close();
+          }
+        };
+
+        ws.onmessage = (event) => {
+          const item = JSON.parse(event.data);
+          appendMessage(item.sender, item.text);
+        };
+      }
+
+      function appendMessage(sender, text) {
+        const wrapper = document.createElement("div");
+        wrapper.className = `message ${sender}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = text;
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const tag = document.createElement("span");
+        tag.textContent =
+          sender === "me" ? "You" : sender === "peer" ? "Device" : "System";
+        meta.appendChild(tag);
+
+        if (sender !== "system") {
+          const time = document.createElement("span");
+          time.textContent = new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          meta.appendChild(time);
+        }
+
+        wrapper.appendChild(bubble);
+        wrapper.appendChild(meta);
+        log.appendChild(wrapper);
+        log.scrollTop = log.scrollHeight;
+
+        if (!windowFocused && sender !== "me") {
+          unread += 1;
+          document.title = `(${unread}) NRF24 Chat`;
+        }
+      }
+
+      function appendSystem(text) {
+        appendMessage("system", text);
+      }
+
+      function sendMsg() {
+        const text = input.value.trim();
+        if (!text) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          appendSystem("Unable to send: device is disconnected.");
+          return;
+        }
+
+        ws.send(JSON.stringify({ text }));
+        input.value = "";
+        appendMessage("me", text);
+      }
+
+      function sendQuick(text) {
+        input.value = text;
+        sendMsg();
+      }
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          sendMsg();
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        windowFocused = true;
+        unread = 0;
+        document.title = "ESP32 NRF24 Chat";
+      });
+
+      window.addEventListener("blur", () => {
+        windowFocused = false;
+      });
+
+      connect();
+    </script>
+  </body>
+</html>
