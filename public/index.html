@@ -6,15 +6,18 @@
     <title>ESP32 NRF24 Chat</title>
     <style>
       :root {
-        --bg: #f2f5fb;
-        --surface: #ffffff;
-        --surface-soft: #edf2fb;
-        --text: #1f2937;
-        --muted: #64748b;
-        --accent: #2563eb;
-        --accent-soft: #dbeafe;
-        --success: #16a34a;
-        --shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+        --bg: #0b1120;
+        --bg-alt: #111827;
+        --surface: rgba(17, 24, 39, 0.88);
+        --surface-soft: #172033;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --accent-soft: rgba(96, 165, 250, 0.16);
+        --success: #34d399;
+        --border: rgba(148, 163, 184, 0.18);
+        --input-bg: rgba(15, 23, 42, 0.72);
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
       }
 
       * {
@@ -32,18 +35,169 @@
           "Segoe UI",
           sans-serif;
         color: var(--text);
-        background: linear-gradient(
-          180deg,
-          #eff4fb 0%,
-          #f8fbff 52%,
-          #f2f5fb 100%
-        );
+        background:
+          radial-gradient(
+            circle at top,
+            rgba(96, 165, 250, 0.18),
+            transparent 35%
+          ),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
       }
 
       .page {
-        max-width: 640px;
+        max-width: 1120px;
         margin: 0 auto;
         padding: 22px 18px 30px;
+      }
+
+      .app-layout {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .sidebar,
+      .sidebar-card {
+        height: 100%;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 22px;
+      }
+
+      .sidebar-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+        overflow: hidden;
+      }
+
+      .sidebar-header {
+        padding: 20px 20px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sidebar-header span {
+        display: block;
+        color: var(--accent);
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .sidebar-header h2 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .chat-list {
+        display: grid;
+      }
+
+      .chat-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .chat-item:last-child {
+        border-bottom: 0;
+      }
+
+      .chat-item.selected {
+        background: rgba(96, 165, 250, 0.12);
+      }
+
+      .chat-item:hover {
+        background: rgba(148, 163, 184, 0.08);
+      }
+
+      .avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        font-weight: 700;
+        color: white;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+      }
+
+      .avatar.offline {
+        background: linear-gradient(135deg, #334155, #1f2937);
+        box-shadow: none;
+      }
+
+      .chat-details {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .chat-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+
+      .chat-name {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chat-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        flex: 0 0 auto;
+      }
+
+      .chat-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #64748b;
+      }
+
+      .chat-status.online .chat-status-dot {
+        background: var(--success);
+      }
+
+      .chat-status.offline .chat-status-dot {
+        background: #64748b;
+      }
+
+      .chat-preview {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.5;
+      }
+
+      .sidebar-footer {
+        padding: 14px 20px 18px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        border-top: 1px solid var(--border);
       }
 
       .hero {
@@ -64,6 +218,13 @@
         margin: 0;
         color: var(--muted);
         line-height: 1.7;
+      }
+
+      .hero,
+      .card,
+      .modal {
+        border: 1px solid var(--border);
+        backdrop-filter: blur(16px);
       }
 
       .card {
@@ -117,12 +278,16 @@
 
       .log-box {
         min-height: 380px;
-        max-height: vh;
+        max-height: 55vh;
         overflow-y: auto;
         padding: 18px 18px 0;
         display: grid;
         gap: 12px;
-        background: var(--surface);
+        background: linear-gradient(
+          180deg,
+          rgba(15, 23, 42, 0.35),
+          rgba(15, 23, 42, 0.18)
+        );
       }
 
       .message {
@@ -153,15 +318,15 @@
       }
 
       .me .bubble {
-        background: #2563eb;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
         color: white;
-        border-color: rgba(37, 99, 235, 0.2);
+        border-color: rgba(59, 130, 246, 0.35);
       }
 
       .peer .bubble {
-        background: #f8fafc;
+        background: rgba(30, 41, 59, 0.9);
         color: var(--text);
-        border-color: #e2e8f0;
+        border-color: var(--border);
       }
 
       .system .bubble {
@@ -200,11 +365,11 @@
       .input-row input {
         width: 100%;
         border-radius: 16px;
-        border: 1px solid #cbd5e1;
+        border: 1px solid var(--border);
         padding: 13px 14px;
         font-size: 1rem;
         color: var(--text);
-        background: #f8fafc;
+        background: var(--input-bg);
       }
 
       .input-row input:focus {
@@ -265,33 +430,24 @@
       .modal {
         width: 100%;
         max-width: 420px;
-        background: white;
+        background: rgba(15, 23, 42, 0.96);
         border-radius: 20px;
         padding: 24px;
         box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
-        display: grid;
-        gap: 12px;
       }
 
       .modal h3 {
-        margin: 0;
-        font-size: 1.3rem;
-        color: var(--text);
+        margin: 0 0 14px;
+        font-size: 1.2rem;
       }
 
       .modal button {
         width: 100%;
-        padding: 14px 16px;
-        background: #f8f9fd;
+        margin-bottom: 10px;
+        background: rgba(30, 41, 59, 0.95);
         color: var(--text);
         border-radius: 14px;
-        border: 1px solid #e2e8f0;
-        text-align: left;
-        font-weight: 600;
-        transition:
-          transform 120ms ease,
-          background-color 120ms ease,
-          border-color 120ms ease;
+        border: 1px solid var(--border);
       }
 
       .modal button:last-child {
@@ -302,16 +458,6 @@
         background: var(--accent);
         color: white;
         border-color: transparent;
-      }
-
-      .modal button:hover {
-        transform: translateY(-1px);
-        background: #eef4ff;
-        border-color: #c7d9f6;
-      }
-
-      .modal button.primary:hover {
-        background: #1d4ed8;
       }
 
       .close-button {
@@ -328,6 +474,14 @@
           border-radius: 22px;
         }
 
+        .app-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+        }
+
         .card-header,
         .actions {
           padding-left: 16px;
@@ -338,54 +492,130 @@
   </head>
   <body>
     <main class="page">
-      <section class="hero">
-        <div class="title-block">
-          <span>Offline team chat</span>
-          <h1>Quick messages for field teams</h1>
-        </div>
-        <p>
-          Designed for small organizations that need fast communication when
-          internet access is unavailable. Use the quick message picker to send
-          common alerts instantly.
-        </p>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <div>
-            <span>Device bridge</span>
-            <h2>Chat with ESP32</h2>
-          </div>
-          <div class="status-pill" id="status-pill">
-            <span class="status-indicator" id="status-dot"></span>
-            <span id="status">connecting...</span>
-          </div>
-        </div>
-
-        <div class="log-box" id="log"></div>
-
-        <div class="actions">
-          <div class="input-row">
-            <div class="field-row">
-              <input
-                id="msg"
-                type="text"
-                placeholder="Type a message..."
-                autocomplete="off"
-              />
-              <button id="sendButton" onclick="sendMsg()">Send</button>
+      <div class="app-layout">
+        <aside class="sidebar">
+          <section class="sidebar-card">
+            <div class="sidebar-header">
+              <span>Chats</span>
+              <h2>Team inbox</h2>
             </div>
-            <button class="quick-button" onclick="toggleQuickModal()">
-              Quick messages
-            </button>
-          </div>
-          <div class="quick-footer">
+
+            <div class="chat-list">
+              <button class="chat-item selected" type="button">
+                <div class="avatar">M</div>
+                <div class="chat-details">
+                  <div class="chat-topline">
+                    <div class="chat-name">Riman</div>
+                    <div class="chat-status online">
+                      <span class="chat-status-dot"></span>
+                      <span>online</span>
+                    </div>
+                  </div>
+                  <p class="chat-preview">Active conversation</p>
+                </div>
+              </button>
+
+              <button class="chat-item" type="button">
+                <div class="avatar offline">A</div>
+                <div class="chat-details">
+                  <div class="chat-topline">
+                    <div class="chat-name">Sufal</div>
+                    <div class="chat-status offline">
+                      <span class="chat-status-dot"></span>
+                      <span>offline</span>
+                    </div>
+                  </div>
+                  <p class="chat-preview">No recent activity</p>
+                </div>
+              </button>
+
+              <button class="chat-item" type="button">
+                <div class="avatar offline">S</div>
+                <div class="chat-details">
+                  <div class="chat-topline">
+                    <div class="chat-name">Support Desk</div>
+                    <div class="chat-status offline">
+                      <span class="chat-status-dot"></span>
+                      <span>offline</span>
+                    </div>
+                  </div>
+                  <p class="chat-preview">Last seen yesterday</p>
+                </div>
+              </button>
+
+              <button class="chat-item" type="button">
+                <div class="avatar offline">R</div>
+                <div class="chat-details">
+                  <div class="chat-topline">
+                    <div class="chat-name">Yushant</div>
+                    <div class="chat-status offline">
+                      <span class="chat-status-dot"></span>
+                      <span>offline</span>
+                    </div>
+                  </div>
+                  <p class="chat-preview">Waiting for connection</p>
+                </div>
+              </button>
+            </div>
+
+            <div class="sidebar-footer">
+              Riman is selected. Other chats are dummy entries marked offline.
+            </div>
+          </section>
+        </aside>
+
+        <div>
+          <section class="hero">
+            <div class="title-block">
+              <span>Offline team chat</span>
+              <h1>Quick messages for field teams</h1>
+            </div>
             <p>
-              Tap a quick message and the popup will let you send it instantly.
+              Designed for small organizations that need fast communication when
+              internet access is unavailable. Use the quick message picker to
+              send common alerts instantly.
             </p>
-          </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <span>Device bridge</span>
+                <h2>Chat with Riman</h2>
+              </div>
+              <div class="status-pill" id="status-pill">
+                <span class="status-indicator" id="status-dot"></span>
+                <span id="status">connecting...</span>
+              </div>
+            </div>
+
+            <div class="log-box" id="log"></div>
+
+            <div class="actions">
+              <div class="input-row">
+                <div class="field-row">
+                  <input
+                    id="msg"
+                    type="text"
+                    placeholder="Type a message..."
+                    autocomplete="off"
+                  />
+                  <button id="sendButton" onclick="sendMsg()">Send</button>
+                </div>
+                <button class="quick-button" onclick="toggleQuickModal()">
+                  Quick messages
+                </button>
+              </div>
+              <div class="quick-footer">
+                <p>
+                  Tap a quick message and the popup will let you send it
+                  instantly.
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </main>
 
     <div class="modal-backdrop" id="quickModal">
@@ -419,7 +649,7 @@
       let ws;
       let unread = 0;
       let windowFocused = true;
-      let pendingLocalMessages = [];
+      const pendingEchoes = [];
 
       function setStatus(text, connected = false) {
         statusEl.textContent = text;
@@ -448,13 +678,7 @@
 
         ws.onmessage = (event) => {
           const item = JSON.parse(event.data);
-          if (
-            item.sender === "me" &&
-            pendingLocalMessages.some(
-              (entry) =>
-                entry.text === item.text && Date.now() - entry.time < 2500,
-            )
-          ) {
+          if (item.sender === "me" && consumePendingEcho(item.text)) {
             return;
           }
           appendMessage(item.sender, item.text);
@@ -500,6 +724,16 @@
         appendMessage("system", text);
       }
 
+      function consumePendingEcho(text) {
+        const index = pendingEchoes.indexOf(text);
+        if (index === -1) {
+          return false;
+        }
+
+        pendingEchoes.splice(index, 1);
+        return true;
+      }
+
       function sendMsg() {
         const text = input.value.trim();
         if (!text) return;
@@ -508,23 +742,16 @@
           return;
         }
 
-        const localEntry = { text, time: Date.now() };
-        pendingLocalMessages.push(localEntry);
+        pendingEchoes.push(text);
         ws.send(JSON.stringify({ text }));
         input.value = "";
         appendMessage("me", text);
-
-        setTimeout(() => {
-          pendingLocalMessages = pendingLocalMessages.filter(
-            (entry) => Date.now() - entry.time < 3000,
-          );
-        }, 3100);
       }
 
       function sendQuick(text) {
-        toggleQuickModal(false);
         input.value = text;
-        setTimeout(sendMsg, 10);
+        toggleQuickModal(false);
+        sendMsg();
       }
 
       function toggleQuickModal(show) {
