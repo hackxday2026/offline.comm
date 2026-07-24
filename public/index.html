@@ -643,6 +643,9 @@
       let unread = 0;
       let windowFocused = true;
       const pendingEchoes = [];
+      let messageHistory = [];
+      const STORAGE_KEY = "offline_comm_chat_history";
+      const HISTORY_LIMIT = 200;
 
       function setStatus(text, connected = false) {
         statusEl.textContent = text;
@@ -678,7 +681,15 @@
         };
       }
 
-      function appendMessage(sender, text) {
+      function appendSystem(text) {
+        appendMessage("system", text, false);
+      }
+
+      function saveHistory() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messageHistory));
+      }
+
+      function addMessageToLog(sender, text, time) {
         const wrapper = document.createElement("div");
         wrapper.className = `message ${sender}`;
 
@@ -694,12 +705,12 @@
         meta.appendChild(tag);
 
         if (sender !== "system") {
-          const time = document.createElement("span");
-          time.textContent = new Date().toLocaleTimeString([], {
+          const timeSpan = document.createElement("span");
+          timeSpan.textContent = time.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           });
-          meta.appendChild(time);
+          meta.appendChild(timeSpan);
         }
 
         wrapper.appendChild(bubble);
@@ -713,8 +724,35 @@
         }
       }
 
-      function appendSystem(text) {
-        appendMessage("system", text);
+      function loadHistory() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+
+        try {
+          const stored = JSON.parse(raw);
+          if (!Array.isArray(stored)) return;
+
+          messageHistory = stored.slice(-200);
+          messageHistory.forEach((entry) => {
+            addMessageToLog(entry.sender, entry.text, new Date(entry.time));
+          });
+        } catch (e) {
+          console.warn("Could not restore chat history:", e);
+        }
+      }
+
+      function appendMessage(sender, text, save = true) {
+        if (save && sender !== "system") {
+          const entry = { sender, text, time: new Date().toISOString() };
+          messageHistory.push(entry);
+          if (messageHistory.length > HISTORY_LIMIT) {
+            messageHistory = messageHistory.slice(-HISTORY_LIMIT);
+          }
+          saveHistory();
+          addMessageToLog(sender, text, new Date(entry.time));
+        } else {
+          addMessageToLog(sender, text, new Date());
+        }
       }
 
       function consumePendingEcho(text) {
@@ -779,6 +817,7 @@
         windowFocused = false;
       });
 
+      loadHistory();
       connect();
     </script>
   </body>
